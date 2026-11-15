@@ -109,17 +109,25 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Prepare gradle.properties
-        shell: pwsh
-        run: |
-          (Get-Content gradle.properties) | Where-Object { $_ -notmatch '^org\.gradle\.java\.home=' } | Set-Content gradle.properties
-
       - name: Build Windows portable package
-        shell: pwsh
+        shell: bash
         env:
           SENTRY_IGNORE_ERRORS: 'true'
+          LASTFM_API_KEY: ''
+          LASTFM_SECRET: ''
+          LYPRIO_BASE_URL: ''
+          LYPRIO_HMAC_KEY: ''
         run: |
-          ./gradlew.bat :desktopApp:assembleWindowsRelease -Pmetrolist.verifyPackaging=false -Pmetrolist.desktop.arch=x86_64 --no-daemon --no-configuration-cache --stacktrace 2>&1 | Tee-Object -FilePath gradle-windows.log
+          set -euo pipefail
+          rm -rf dist
+          sed -i '/^org.gradle.java.home=/d' gradle.properties
+          chmod +x ./gradlew
+          ./gradlew :desktopApp:assembleWindowsRelease \
+            -Pmetrolist.verifyPackaging=false \
+            -Pmetrolist.desktop.arch=x86_64 \
+            --no-daemon \
+            --no-configuration-cache \
+            --stacktrace
 
       - name: Upload Windows portable package
         if: success()
@@ -129,12 +137,3 @@ jobs:
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 14
-
-      - name: Upload Windows Build Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows-Build-Log
-          path: gradle-windows.log
-          if-no-files-found: ignore
-          retention-days: 7
