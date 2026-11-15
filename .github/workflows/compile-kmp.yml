@@ -1,0 +1,117 @@
+name: Compile KMP (Android & Windows)
+
+on:
+  push:
+    branches: [ KMP ]
+  workflow_dispatch:
+
+concurrency:
+  group: compile-kmp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build Android (APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare gradle environment & signing
+        shell: bash
+        run: |
+          sed -i '/^org.gradle.java.home=/d' gradle.properties
+          chmod +x ./gradlew
+          keytool -genkeypair -v -keystore release.keystore -alias metrofuse -keyalg RSA -keysize 2048 -validity 10000 -storepass password -keypass password -dname "CN=MetroFuse, OU=Build, O=MetroFuse, L=Default, S=Default, C=US"
+
+      - name: Build Android APKs
+        shell: bash
+        env:
+          KEYSTORE_PATH: release.keystore
+          KEYSTORE_PASSWORD: password
+          KEY_ALIAS: metrofuse
+          KEY_PASSWORD: password
+        run: |
+          ./gradlew :androidApp:assembleRelease :androidApp:assembleDebug --no-daemon --no-configuration-cache -x :androidApp:lintVitalRelease
+
+      - name: Upload Android APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: MetroFuse-Android-APKs
+          path: |
+            androidApp/build/outputs/apk/release/*.apk
+            androidApp/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows:
+    name: Build Windows (Desktop x64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: metro-wv2-helper/global.json
+
+      - name: Build Windows login helper
+        shell: pwsh
+        run: |
+          $output = "desktopApp/src/desktopMain/resources/windows"
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+          dotnet publish "metro-wv2-helper/metro-wv2-helper.csproj" --configuration Release --runtime win-x64 --self-contained true --output $output -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -p:PublishReadyToRun=true
+          $helper = Join-Path $output "metro-wv2-helper.exe"
+          if (-not (Test-Path $helper -PathType Leaf)) { throw "Windows login helper was not produced at $helper" }
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare gradle.properties
+        shell: pwsh
+        run: |
+          (Get-Content gradle.properties) | Where-Object { $_ -notmatch '^org\.gradle\.java\.home=' } | Set-Content gradle.properties
+
+      - name: Build Windows portable package
+        shell: pwsh
+        run: |
+          ./gradlew.bat :desktopApp:assembleWindowsRelease -Pmetrolist.verifyPackaging=false -Pmetrolist.desktop.arch=x86_64 --no-daemon --no-configuration-cache
+
+      - name: Upload Windows portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: MetroFuse-Windows-x64
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
