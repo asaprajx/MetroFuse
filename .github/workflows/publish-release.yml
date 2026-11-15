@@ -7,47 +7,42 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
-  publish-release:
-    name: Publish Release to GitHub
+  publish:
+    name: Publish Release
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Android Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: MetroFuse-Android-APKs
-          run-id: '43668221186'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: release-assets/android
+      - name: Download artifacts from build run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          gh run download 43668221186 --repo "$GITHUB_REPOSITORY" --dir release-assets
+          echo "=== Downloaded Artifacts ==="
+          ls -lR release-assets
 
-      - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: MetroFuse-Windows-x64
-          run-id: '43668221186'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: release-assets/windows
-
-      - name: Collect and inspect release files
+      - name: Collect files and publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           mkdir -p release-files
           find release-assets/ -type f -name "*.apk" -exec cp -v {} release-files/ \;
           find release-assets/ -type f -name "*.zip" -exec cp -v {} release-files/ \;
-          echo "=== Collected Release Files ==="
+          echo "=== Release Files ==="
           ls -lh release-files/
 
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
           TAG="v14.0.0-alpha"
+          gh release delete "$TAG" --yes --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+
           gh release create "$TAG" release-files/* \
+            --repo "$GITHUB_REPOSITORY" \
             --title "MetroFuse $TAG (KMP)" \
             --notes "### MetroFuse Alpha (KMP Build)
 
