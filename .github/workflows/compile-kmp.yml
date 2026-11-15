@@ -46,14 +46,16 @@ jobs:
       - name: Build Android APKs
         shell: bash
         env:
-          KEYSTORE_PATH: release.keystore
+          KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
           KEYSTORE_PASSWORD: password
           KEY_ALIAS: metrofuse
           KEY_PASSWORD: password
+          SENTRY_IGNORE_ERRORS: 'true'
         run: |
-          ./gradlew :androidApp:assembleRelease :androidApp:assembleDebug --no-daemon --no-configuration-cache -x :androidApp:lintVitalRelease
+          ./gradlew :androidApp:assembleRelease :androidApp:assembleDebug --no-daemon --no-configuration-cache --stacktrace -x :androidApp:lintVitalRelease 2>&1 | tee gradle-android.log
 
       - name: Upload Android APKs
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: MetroFuse-Android-APKs
@@ -62,6 +64,15 @@ jobs:
             androidApp/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload Android Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-Build-Log
+          path: gradle-android.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   build-windows:
     name: Build Windows (Desktop x64)
@@ -105,13 +116,25 @@ jobs:
 
       - name: Build Windows portable package
         shell: pwsh
+        env:
+          SENTRY_IGNORE_ERRORS: 'true'
         run: |
-          ./gradlew.bat :desktopApp:assembleWindowsRelease -Pmetrolist.verifyPackaging=false -Pmetrolist.desktop.arch=x86_64 --no-daemon --no-configuration-cache
+          ./gradlew.bat :desktopApp:assembleWindowsRelease -Pmetrolist.verifyPackaging=false -Pmetrolist.desktop.arch=x86_64 --no-daemon --no-configuration-cache --stacktrace 2>&1 | Tee-Object -FilePath gradle-windows.log
 
       - name: Upload Windows portable package
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: MetroFuse-Windows-x64
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload Windows Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Build-Log
+          path: gradle-windows.log
+          if-no-files-found: ignore
+          retention-days: 7
