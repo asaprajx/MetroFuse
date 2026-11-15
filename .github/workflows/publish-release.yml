@@ -20,7 +20,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: MetroFuse-Android-APKs
-          run-id: 43668221186
+          run-id: '43668221186'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: release-assets/android
 
@@ -28,7 +28,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: MetroFuse-Windows-x64
-          run-id: 43668221186
+          run-id: '43668221186'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: release-assets/windows
 
