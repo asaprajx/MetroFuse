@@ -5,6 +5,10 @@ on:
     branches: [ KMP ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   publish:
     name: Publish Release
@@ -39,14 +43,14 @@ jobs:
 
           gh release create "$TAG" release-files/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "MetroFuse $TAG (KMP)" \
-            --notes "### MetroFuse Alpha (KMP Build)
+            --title "MetroFuse v14.0.0-alpha (KMP)" \
+            --notes '### MetroFuse Alpha (KMP Build)
 
-Compiled via GitHub Actions from the \`KMP\` branch.
+Compiled via GitHub Actions from the KMP branch.
 
 #### Included Packages:
-- **Android:** Release & Debug APKs
-- **Windows:** Portable package (.zip) for x64 Windows
+- Android: Release & Debug APKs
+- Windows: Portable package (.zip) for x64 Windows
 
-*Note: This is an Alpha pre-release build.*" \
+Note: This is an Alpha pre-release build.' \
             --prerelease
