@@ -1,0 +1,70 @@
+name: Publish Alpha Release
+
+on:
+  push:
+    branches: [ KMP ]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag'
+        required: true
+        default: 'v14.0.0-alpha'
+      run_id:
+        description: 'Workflow run ID to fetch artifacts from'
+        required: true
+        default: '43668221186'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    name: Publish Release to GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Android Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: MetroFuse-Android-APKs
+          run-id: ${{ github.event.inputs.run_id || '43668221186' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release-assets/android
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: MetroFuse-Windows-x64
+          run-id: ${{ github.event.inputs.run_id || '43668221186' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release-assets/windows
+
+      - name: Collect and inspect release files
+        shell: bash
+        run: |
+          mkdir -p release-files
+          find release-assets/ -type f -name "*.apk" -exec cp -v {} release-files/ \;
+          find release-assets/ -type f -name "*.zip" -exec cp -v {} release-files/ \;
+          echo "=== Collected Release Files ==="
+          ls -lh release-files/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag_name || 'v14.0.0-alpha' }}"
+          gh release create "$TAG" release-files/* \
+            --title "MetroFuse $TAG (KMP)" \
+            --notes "### MetroFuse Alpha (KMP Build)
+
+Compiled via GitHub Actions from the \`KMP\` branch.
+
+#### Included Packages:
+- **Android:** Release & Debug APKs
+- **Windows:** Portable package (.zip) for x64 Windows
+
+*Note: This is an Alpha pre-release build.*" \
+            --prerelease
